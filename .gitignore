@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.idea/
+*.iml
+android/.gradle/
+android/local.properties
+ios/App/Pods/
+ios/App/App.xcworkspace/
