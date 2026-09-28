@@ -169,6 +169,12 @@ public class MainActivity extends BridgeActivity {
         view.getSettings().setDomStorageEnabled(true);
         view.getSettings().setDatabaseEnabled(true);
         view.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        if ("whatsapp".equals(key)) {
+            // WhatsApp Web exige un navegador de escritorio para vincular la sesion.
+            view.getSettings().setUserAgentString(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            );
+        }
         boolean isRdweb = "rdweb".equals(key);
         view.setWebViewClient(new WebViewClient() {
             @Override

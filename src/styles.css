@@ -76,7 +76,7 @@ h1, h2, p { margin: 0; }
 .nav-rail {
   grid-area: nav;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   padding: 6px 6px calc(6px + var(--safe-bottom));
   background: var(--surface);
   border-top: 1px solid var(--stroke);
@@ -155,6 +155,7 @@ h1, h2, p { margin: 0; }
 }
 .resource-icon svg { width: 38px; height: 38px; }
 .resource-icon.extranet { background: linear-gradient(135deg, #4e8a1f, #2d5a10); }
+.resource-icon.whatsapp { background: linear-gradient(135deg, #25d366, #128c4a); }
 .resource-icon.big { width: 88px; height: 88px; }
 .resource-icon.big svg { width: 46px; height: 46px; }
 
