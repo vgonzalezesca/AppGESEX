@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.4.0",
-    "@capacitor/browser": "^7.0.0",
     "@capacitor/core": "^7.4.0",
     "@capacitor/ios": "^7.4.0",
     "@capgo/inappbrowser": "^7.29.4"

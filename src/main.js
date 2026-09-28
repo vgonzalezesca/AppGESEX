@@ -12,6 +12,11 @@ const CONFIG = {
     label: 'Extranet',
     url: 'https://extranet.gesex.cl/gesex_calidad2/auth/login',
     description: 'Portal de calidad y formularios de trabajo.'
+  },
+  whatsapp: {
+    label: 'WhatsApp Web',
+    url: 'https://web.whatsapp.com',
+    description: 'Chatea desde WhatsApp Web.'
   }
 };
 
@@ -23,9 +28,11 @@ const state = {
   photoUrl: null
 };
 
-// Plugin nativo propio (MainActivity.java): oculta barras de sistema en Android.
-const Immersive = registerPlugin('GesexImmersive');
+// Plugin nativo propio (MainActivity.java): en Android mantiene RDWeb y Extranet
+// como WebViews persistentes (multitarea real, sin perder sesion al cambiar entre ambas).
+const Sessions = registerPlugin('GesexSessions');
 const isNative = Capacitor.isNativePlatform();
+const platform = Capacitor.getPlatform();
 
 const icon = (name) => {
   const icons = {
@@ -40,12 +47,14 @@ const icon = (name) => {
     offline: '<path d="m3 3 18 18M10.6 5.2A16 16 0 0 1 21 8.5M5 12a11 11 0 0 1 4.5-2.5M8.5 15.5a6 6 0 0 1 3.5-1M12 20h.01"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
     chevron: '<path d="m9 6 6 6-6 6"/>',
-    keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h4M6 16h12"/>'
+    keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h4M6 16h12"/>',
+    chat: '<path d="M21 11.5a8.38 8.38 0 0 1-8.9 8.4 8.5 8.5 0 0 1-4-1L3 20l1.1-5A8.38 8.38 0 0 1 3 11.5 8.4 8.4 0 0 1 11.6 3a8.38 8.38 0 0 1 9.4 8.5Z"/>'
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.home}</svg>`;
 };
 
-const iconFor = (key) => (key === 'rdweb' ? 'monitor' : 'globe');
+const ICON_BY_KEY = { rdweb: 'monitor', extranet: 'globe', whatsapp: 'chat' };
+const iconFor = (key) => ICON_BY_KEY[key] || 'globe';
 const RETURN_HINT = 'Se abrira en pantalla completa. Para volver aqui, toca dos veces el boton de inicio del borde izquierdo.';
 
 function tile(key) {
@@ -72,6 +81,7 @@ document.querySelector('#app').innerHTML = `
       <button data-nav="home">${icon('home')}<span>Inicio</span></button>
       <button data-nav="rdweb">${icon('monitor')}<span>RemoteApps</span></button>
       <button data-nav="extranet">${icon('globe')}<span>Extranet</span></button>
+      <button data-nav="whatsapp">${icon('chat')}<span>WhatsApp</span></button>
       <button data-nav="settings">${icon('settings')}<span>Ajustes</span></button>
     </nav>
 
@@ -82,13 +92,14 @@ document.querySelector('#app').innerHTML = `
           <p>Toca una aplicacion para abrirla.</p>
           <span class="availability" id="homeAvailability"></span>
         </div>
-        <div class="resource-grid">${tile('rdweb')}${tile('extranet')}</div>
+        <div class="resource-grid">${tile('rdweb')}${tile('extranet')}${tile('whatsapp')}</div>
         <div class="infobar">${icon('info')}<div><b>Como volver a esta pantalla</b><p>${RETURN_HINT}</p></div></div>
         <button class="list-item" data-open-view="settings"><span class="list-icon">${icon('camera')}</span><span><b>Probar camara y teclado</b><small>Verifica que todo funcione antes de empezar</small></span>${icon('chevron')}</button>
       </section>
 
       <section class="view" data-view="rdweb">${launchView('rdweb')}</section>
       <section class="view" data-view="extranet">${launchView('extranet')}</section>
+      <section class="view" data-view="whatsapp">${launchView('whatsapp')}</section>
 
       <section class="view" data-view="settings">
         <div class="page-heading"><h1>Ajustes</h1><p>Ajusta la experiencia movil sin cambiar la configuracion de RDWeb.</p></div>
@@ -139,7 +150,8 @@ function toast(message) {
   toast.timeout = setTimeout(() => element.classList.remove('visible'), 3500);
 }
 
-// Se inyecta en RDWeb/Extranet: boton flotante de inicio (doble toque para salir).
+// Se inyecta solo en iOS (ver mas abajo): boton flotante de inicio (doble toque para salir).
+// En Android el boton de inicio es nativo (MainActivity.java) y no requiere esto.
 // Debe ser autocontenida: se serializa con toString().
 function homeButtonScript() {
   if (document.getElementById('gesex-home')) return;
@@ -176,16 +188,25 @@ function homeButtonScript() {
 }
 
 const HOME_BUTTON_JS = `(${homeButtonScript.toString()})();`;
-let browserListeners = null;
+let iosBrowserListeners = null;
 
-async function attachBrowserListeners() {
-  if (browserListeners) return;
-  browserListeners = [
-    await InAppBrowser.addListener('browserPageLoaded', () => {
-      InAppBrowser.executeScript({ code: HOME_BUTTON_JS }).catch(() => {});
-      Immersive.apply().catch(() => {});
-    })
-  ];
+// iOS no tiene aun el plugin nativo GesexSessions: usa el modal InAppBrowser existente
+// (una sesion a la vez; se pierde al cambiar entre RDWeb y Extranet, a diferencia de Android).
+async function openExternalIOS(key) {
+  const url = CONFIG[key].url;
+  if (!iosBrowserListeners) {
+    iosBrowserListeners = [
+      await InAppBrowser.addListener('browserPageLoaded', () => {
+        InAppBrowser.executeScript({ code: HOME_BUTTON_JS }).catch(() => {});
+      })
+    ];
+  }
+  await InAppBrowser.openWebView({
+    url,
+    toolbarType: ToolBarType.BLANK,
+    isPresentAfterPageLoad: false,
+    activeNativeNavigationForWebview: true
+  });
 }
 
 async function openExternal(key) {
@@ -199,14 +220,11 @@ async function openExternal(key) {
     return;
   }
   try {
-    await attachBrowserListeners();
-    await InAppBrowser.openWebView({
-      url,
-      toolbarType: ToolBarType.BLANK,
-      isPresentAfterPageLoad: false,
-      activeNativeNavigationForWebview: true
-    });
-    Immersive.apply().catch(() => {});
+    if (platform === 'android') {
+      await Sessions.open({ key, url });
+    } else {
+      await openExternalIOS(key);
+    }
   } catch {
     toast('No se pudo abrir el servicio. Intenta nuevamente.');
   }
@@ -256,5 +274,5 @@ window.addEventListener('offline', () => { state.online = false; updateConnectio
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 updateConnection();
-showView(['home', 'rdweb', 'extranet', 'settings'].includes(state.view) ? state.view : 'home');
+showView(['home', 'rdweb', 'extranet', 'whatsapp', 'settings'].includes(state.view) ? state.view : 'home');
 if (state.keyboardPersistent) document.querySelector('#keyboardDock').hidden = false;

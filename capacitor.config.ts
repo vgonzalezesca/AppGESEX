@@ -11,9 +11,6 @@ const config: CapacitorConfig = {
       launchShowDuration: 500,
       backgroundColor: '#08284d',
       showSpinner: false
-    },
-    Browser: {
-      toolbarColor: '#08284d'
     }
   }
 };
