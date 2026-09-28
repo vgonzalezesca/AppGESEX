@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'cl.gesex.app',
-  appName: 'GESEX Mobile',
+  appName: 'GESEX Control de Calidad',
   webDir: 'dist',
   bundledWebRuntime: false,
   backgroundColor: '#08284d',

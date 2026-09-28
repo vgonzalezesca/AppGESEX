@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">GESEX Mobile</string>
-    <string name="title_activity_main">GESEX Mobile</string>
+    <string name="app_name">GESEX Control de Calidad</string>
+    <string name="title_activity_main">GESEX Control de Calidad</string>
     <string name="package_name">cl.gesex.app</string>
     <string name="custom_url_scheme">cl.gesex.app</string>
 </resources>
