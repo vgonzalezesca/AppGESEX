@@ -1,11 +1,12 @@
-import { Browser } from '@capacitor/browser';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import { InAppBrowser, ToolBarType } from '@capgo/inappbrowser';
 import './styles.css';
 
 const CONFIG = {
   rdweb: {
     label: 'RemoteApps',
     url: 'https://rdsapp.gesex.cl/RDWeb/webclient/',
-    description: 'Aplicaciones Windows publicadas por GESEX.'
+    description: 'Programas de Windows de GESEX.'
   },
   extranet: {
     label: 'Extranet',
@@ -22,6 +23,10 @@ const state = {
   photoUrl: null
 };
 
+// Plugin nativo propio (MainActivity.java): oculta barras de sistema en Android.
+const Immersive = registerPlugin('GesexImmersive');
+const isNative = Capacitor.isNativePlatform();
+
 const icon = (name) => {
   const icons = {
     home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-6h6v6"/>',
@@ -33,101 +38,77 @@ const icon = (name) => {
     external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/>',
     wifi: '<path d="M2 8.5a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8.5 15.5a6 6 0 0 1 7 0M12 20h.01"/>',
     offline: '<path d="m3 3 18 18M10.6 5.2A16 16 0 0 1 21 8.5M5 12a11 11 0 0 1 4.5-2.5M8.5 15.5a6 6 0 0 1 3.5-1M12 20h.01"/>',
-    back: '<path d="m15 18-6-6 6-6"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    chevron: '<path d="m9 6 6 6-6 6"/>',
     keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h4M6 16h12"/>'
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.home}</svg>`;
 };
 
+const iconFor = (key) => (key === 'rdweb' ? 'monitor' : 'globe');
+const RETURN_HINT = 'Se abrira en pantalla completa. Para volver aqui, toca dos veces el boton de inicio del borde izquierdo.';
+
+function tile(key) {
+  const remote = CONFIG[key];
+  return `<button class="resource-card" data-open-external="${key}"><span class="resource-icon ${key}">${icon(iconFor(key))}</span><b>${remote.label}</b><small>${remote.description}</small><span class="resource-open">Abrir ${icon('arrow')}</span></button>`;
+}
+
+function launchView(key) {
+  const remote = CONFIG[key];
+  return `<div class="page-heading"><h1>${remote.label}</h1><p>${remote.description}</p></div><div class="launch-card"><span class="resource-icon big ${key}">${icon(iconFor(key))}</span><div><h2>Listo para ingresar</h2><p>${RETURN_HINT}</p></div><button class="launch-button" data-open-external="${key}">${icon('external')}Abrir ${remote.label}</button></div>`;
+}
+
 document.querySelector('#app').innerHTML = `
   <div class="app-shell">
-    <header class="topbar">
+    <header class="titlebar">
       <div class="brand-lockup">
         <img src="/gesex-logo.jpg" alt="GESEX" class="brand-logo" />
-        <div>
-          <span class="eyebrow">ESPACIO DE TRABAJO</span>
-          <strong>GESEX Mobile</strong>
-        </div>
+        <strong>GESEX</strong>
       </div>
       <div class="connection-pill" id="connectionStatus" aria-live="polite"></div>
     </header>
 
-    <main class="content" id="content">
-      <section class="view" data-view="home">
-        <div class="hero-panel">
-          <div>
-            <span class="eyebrow lime">ACCESO CENTRALIZADO</span>
-            <h1>Tu jornada, en una sola pantalla.</h1>
-            <p>Ingresa a tus RemoteApps Windows y al portal Extranet desde tu dispositivo movil.</p>
-          </div>
-          <div class="hero-orbit"><span>GE</span></div>
-        </div>
-
-        <div class="section-heading">
-          <div><span class="eyebrow">DESTACADOS</span><h2>Aplicaciones de trabajo</h2></div>
-          <span class="availability" id="homeAvailability"></span>
-        </div>
-        <div class="app-grid">
-          <button class="app-card app-card-primary" data-open-external="rdweb">
-            <span class="card-icon">${icon('monitor')}</span>
-            <span class="card-copy"><b>RemoteApps</b><small>Aplicaciones Windows publicadas</small></span>
-            <span class="card-arrow">${icon('arrow')}</span>
-          </button>
-          <button class="app-card" data-open-external="extranet">
-            <span class="card-icon">${icon('globe')}</span>
-            <span class="card-copy"><b>Extranet</b><small>Portal de calidad GESEX</small></span>
-            <span class="card-arrow">${icon('arrow')}</span>
-          </button>
-        </div>
-
-        <div class="info-strip">
-          <span class="info-icon">${icon('camera')}</span>
-          <div><b>Fotografia disponible</b><p>La Extranet puede solicitar camara o galeria en Android, segun el formulario.</p></div>
-          <button class="text-button" data-open-view="settings">Probar</button>
-        </div>
-      </section>
-
-      <section class="view" data-view="rdweb">
-        ${launchView('rdweb')}
-      </section>
-
-      <section class="view" data-view="extranet">
-        ${launchView('extranet')}
-      </section>
-
-      <section class="view" data-view="settings">
-        <div class="page-heading"><span class="eyebrow">DISPOSITIVO</span><h1>Preferencias</h1><p>Ajusta la experiencia movil sin cambiar la configuracion de RDWeb.</p></div>
-        <div class="settings-grid">
-          <article class="settings-card">
-            <div class="setting-title"><span class="card-icon small">${icon('keyboard')}</span><div><b>Teclado persistente</b><p>Mantiene un campo local listo para activar el teclado del sistema.</p></div><label class="switch"><input type="checkbox" id="keyboardToggle"><span></span></label></div>
-            <div class="keyboard-dock" id="keyboardDock" hidden><input id="keyboardAnchor" type="text" placeholder="Campo de teclado" autocomplete="off"><span>El teclado fisico funciona automaticamente.</span></div>
-          </article>
-          <article class="settings-card camera-card">
-            <div class="setting-title"><span class="card-icon small">${icon('camera')}</span><div><b>Prueba de fotografia</b><p>Verifica camara o galeria antes de usar el formulario Extranet.</p></div></div>
-            <label class="photo-picker"><input id="photoInput" type="file" accept="image/*" capture="environment"><span>${icon('camera')} Seleccionar fotografia</span></label>
-            <div class="photo-result" id="photoResult" hidden><img id="photoPreview" alt="Vista previa de fotografia"><button class="text-button" id="clearPhoto">Quitar</button></div>
-          </article>
-        </div>
-        <div class="notice"><b>Modo sin conexion parcial</b><p>La pantalla, preferencias y esta prueba quedan disponibles sin internet. RDWeb, autenticacion AD, RemoteApps y Extranet requieren conectividad.</p></div>
-      </section>
-    </main>
-
-    <nav class="bottom-nav" aria-label="Navegacion principal">
+    <nav class="nav-rail" aria-label="Navegacion principal">
       <button data-nav="home">${icon('home')}<span>Inicio</span></button>
       <button data-nav="rdweb">${icon('monitor')}<span>RemoteApps</span></button>
       <button data-nav="extranet">${icon('globe')}<span>Extranet</span></button>
       <button data-nav="settings">${icon('settings')}<span>Ajustes</span></button>
     </nav>
+
+    <main class="content" id="content">
+      <section class="view" data-view="home">
+        <div class="page-heading">
+          <h1>Aplicaciones</h1>
+          <p>Toca una aplicacion para abrirla.</p>
+          <span class="availability" id="homeAvailability"></span>
+        </div>
+        <div class="resource-grid">${tile('rdweb')}${tile('extranet')}</div>
+        <div class="infobar">${icon('info')}<div><b>Como volver a esta pantalla</b><p>${RETURN_HINT}</p></div></div>
+        <button class="list-item" data-open-view="settings"><span class="list-icon">${icon('camera')}</span><span><b>Probar camara y teclado</b><small>Verifica que todo funcione antes de empezar</small></span>${icon('chevron')}</button>
+      </section>
+
+      <section class="view" data-view="rdweb">${launchView('rdweb')}</section>
+      <section class="view" data-view="extranet">${launchView('extranet')}</section>
+
+      <section class="view" data-view="settings">
+        <div class="page-heading"><h1>Ajustes</h1><p>Ajusta la experiencia movil sin cambiar la configuracion de RDWeb.</p></div>
+        <div class="settings-grid">
+          <article class="settings-card">
+            <div class="setting-title"><span class="list-icon">${icon('keyboard')}</span><div><b>Teclado persistente</b><p>Mantiene un campo local listo para activar el teclado del sistema.</p></div><label class="switch"><input type="checkbox" id="keyboardToggle"><span></span></label></div>
+            <div class="keyboard-dock" id="keyboardDock" hidden><input id="keyboardAnchor" type="text" placeholder="Campo de teclado" autocomplete="off"><span>El teclado fisico funciona automaticamente.</span></div>
+          </article>
+          <article class="settings-card">
+            <div class="setting-title"><span class="list-icon">${icon('camera')}</span><div><b>Prueba de fotografia</b><p>Verifica camara o galeria antes de usar el formulario Extranet.</p></div></div>
+            <label class="photo-picker"><input id="photoInput" type="file" accept="image/*" capture="environment"><span>${icon('camera')} Seleccionar fotografia</span></label>
+            <div class="photo-result" id="photoResult" hidden><img id="photoPreview" alt="Vista previa de fotografia"><button class="text-button" id="clearPhoto">Quitar</button></div>
+          </article>
+        </div>
+        <div class="infobar">${icon('info')}<div><b>Modo sin conexion parcial</b><p>La pantalla, preferencias y esta prueba quedan disponibles sin internet. RDWeb, autenticacion AD, RemoteApps y Extranet requieren conectividad.</p></div></div>
+      </section>
+    </main>
   </div>
   <div class="toast" id="toast" role="status"></div>
 `;
-
-function launchView(key) {
-  const remote = CONFIG[key];
-  const action = key === 'rdweb' ? 'Abrir RemoteApps' : 'Abrir Extranet';
-  const iconName = key === 'rdweb' ? 'monitor' : 'globe';
-  return `<div class="page-heading"><div><span class="eyebrow">APLICACION GESEX</span><h1>${icon(iconName)}${remote.label}</h1><p>${remote.description}</p></div></div><div class="launch-panel"><div class="launch-symbol">${icon(iconName)}</div><div><span class="eyebrow">ACCESO EXTERNO SEGURO</span><h2>Listo para ingresar</h2><p>El servicio se abrira en la vista segura del dispositivo, conservando el acceso a camara, galeria, teclado y autenticacion.</p><button class="launch-button" data-open-external="${key}">${icon('external')}${action}</button></div></div><div class="url-note"><span>Destino</span><code>${remote.url}</code></div>`;
-}
 
 const views = [...document.querySelectorAll('[data-view]')];
 const navItems = [...document.querySelectorAll('[data-nav]')];
@@ -146,7 +127,7 @@ function updateConnection() {
   const availability = document.querySelector('#homeAvailability');
   status.innerHTML = state.online ? `${icon('wifi')} En linea` : `${icon('offline')} Sin conexion`;
   status.classList.toggle('offline', !state.online);
-  availability.textContent = state.online ? 'SERVICIOS DISPONIBLES' : 'SHELL DISPONIBLE OFFLINE';
+  availability.textContent = state.online ? 'Servicios disponibles' : 'Sin conexion: los servicios no estan disponibles';
   availability.classList.toggle('offline', !state.online);
 }
 
@@ -158,16 +139,76 @@ function toast(message) {
   toast.timeout = setTimeout(() => element.classList.remove('visible'), 3500);
 }
 
+// Se inyecta en RDWeb/Extranet: boton flotante de inicio (doble toque para salir).
+// Debe ser autocontenida: se serializa con toString().
+function homeButtonScript() {
+  if (document.getElementById('gesex-home')) return;
+  const b = document.createElement('button');
+  b.id = 'gesex-home';
+  b.type = 'button';
+  b.setAttribute('aria-label', 'Volver al inicio de GESEX');
+  const svg = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/></svg>';
+  const idle = 'position:fixed;left:0;top:50%;z-index:2147483647;height:52px;margin-top:-26px;border:0;border-radius:0 16px 16px 0;display:flex;align-items:center;gap:8px;padding:0 10px;font:600 15px system-ui,sans-serif;color:#fff;touch-action:none;box-shadow:0 4px 14px rgba(0,0,0,.25);';
+  let armed = 0;
+  let startY = null;
+  let moved = false;
+  const reset = () => { armed = 0; b.innerHTML = svg; b.style.background = 'rgba(8,40,77,.55)'; };
+  b.style.cssText = idle;
+  reset();
+  const stop = (e) => e.stopPropagation();
+  ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach((t) => b.addEventListener(t, stop));
+  b.addEventListener('pointerdown', (e) => { e.stopPropagation(); startY = e.clientY; moved = false; b.setPointerCapture(e.pointerId); });
+  b.addEventListener('pointermove', (e) => {
+    if (startY === null) return;
+    if (Math.abs(e.clientY - startY) > 8) moved = true;
+    if (moved) b.style.top = Math.max(40, Math.min(window.innerHeight - 40, e.clientY)) + 'px';
+  });
+  b.addEventListener('pointerup', (e) => {
+    e.stopPropagation();
+    startY = null;
+    if (moved) return;
+    if (armed) { window.mobileApp && window.mobileApp.close(); return; }
+    armed = setTimeout(reset, 3000);
+    b.innerHTML = svg + '<span>Toca otra vez para volver</span>';
+    b.style.background = '#08284d';
+  });
+  (document.body || document.documentElement).appendChild(b);
+}
+
+const HOME_BUTTON_JS = `(${homeButtonScript.toString()})();`;
+let browserListeners = null;
+
+async function attachBrowserListeners() {
+  if (browserListeners) return;
+  browserListeners = [
+    await InAppBrowser.addListener('browserPageLoaded', () => {
+      InAppBrowser.executeScript({ code: HOME_BUTTON_JS }).catch(() => {});
+      Immersive.apply().catch(() => {});
+    })
+  ];
+}
+
 async function openExternal(key) {
   if (!state.online) {
     toast('Este servicio requiere conexion a internet');
     return;
   }
   const url = CONFIG[key].url;
+  if (!isNative) {
+    window.open(url, '_blank');
+    return;
+  }
   try {
-    await Browser.open({ url, toolbarColor: '#08284d' });
+    await attachBrowserListeners();
+    await InAppBrowser.openWebView({
+      url,
+      toolbarType: ToolBarType.BLANK,
+      isPresentAfterPageLoad: false,
+      activeNativeNavigationForWebview: true
+    });
+    Immersive.apply().catch(() => {});
   } catch {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    toast('No se pudo abrir el servicio. Intenta nuevamente.');
   }
 }
 
